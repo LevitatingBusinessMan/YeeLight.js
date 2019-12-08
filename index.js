@@ -1,1 +1,1 @@
-module.exports = require("src/Client")
+module.exports = require(__dirname + "/src/Client")

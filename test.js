@@ -1,5 +1,8 @@
-const Client = require(__dirname + "/src/Client")
+const Client_ = require(__dirname)
+const Client = new Client_()
 
-Client.Discover(light => {
-    light.on()
+Client.on("discovered", light => {
+    light.toggle()
 })
+
+Client.Discover()
