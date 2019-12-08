@@ -86,7 +86,6 @@ class YeeLight extends EventEmitter {
             //Add to response listeners
             this.listeners[id] = resolve
 
-            console.log(JSON.stringify(command))
             this.server.write(JSON.stringify(command) + "\r\n")
         })
     }
