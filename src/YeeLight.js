@@ -2,6 +2,7 @@ const EventEmitter = require("events")
 
 class YeeLight extends EventEmitter {   
     lastCommand = 0
+    listeners = {}
  
     constructor(msg) {
         super()
@@ -14,38 +15,66 @@ class YeeLight extends EventEmitter {
 
         this.server = require("net").connect({port: this.port, host: this.ip})
 
-        //Notification messages
         this.server.on("data", d => {
             d = JSON.parse(d)
 
-            //Make sure this is a notification message
+            //Check if this is a notifaction message
             if (d.method) {
                 Object.assign(this, d.params)
 
                 //Emit updated props
                 this.emit("update", d.params)
             }
-        })
+            
+            //Else response message
+            else if (typeof d.id != "undefined") {
+                if (this.listeners[d.id]) {
+                    
+                    //Run callback
+                    this.listeners[d.id](d)
 
-        //this.server.on("connect", () => this.emit("connected"))
+                    delete this.listeners[d.id]
+                }
+            }
+        })
+        this.server.on("close", console.log)
+        this.server.on("error", console.error)
+        this.server.on("close", hadError => this.emit("disconnected"))
     }
 
-    async setPower(value, ...params) {
+    async powerOn () {
+        return await this.Command("set_power", ["on"])
+    }
+
+    async powerOff () {
+        return await this.Command("set_power", ["off"])
+    }
+
+    async setPower (state, ...params) {
         //Convert boolean
-        if (value === true)
-            value = "on"
-        else if (value === false)
-            value = "off"
+        if (state === true)
+            state = "on"
+        else if (state === false)
+            state = "off"
 
         //Add power setting as first param
-        params.unshift(value)
+        params.unshift(state)
 
         return await this.Command("set_power", params)
         
     }
 
-    async toggle() {
+    async toggle () {
         return await this.Command("toggle")
+    }
+
+    async setBright (brightness, ...params) {
+        if (typeof brightness === "string")
+            brightness = parseInt(brightness)
+
+        params.unshift(brightness)
+
+        return await this.Command("set_bright", params)
     }
 
     Command (method, params=[]) {
@@ -54,14 +83,10 @@ class YeeLight extends EventEmitter {
 
             const command = {id, method, params}
     
-            this.server.once("data", d => {
-                d = JSON.parse(d)
+            //Add to response listeners
+            this.listeners[id] = resolve
 
-                if (d.id == id)
-                    resolve(d)
-                
-            })
-    
+            console.log(JSON.stringify(command))
             this.server.write(JSON.stringify(command) + "\r\n")
         })
     }
@@ -88,45 +113,3 @@ class YeeLight extends EventEmitter {
 }
 
 module.exports = YeeLight
-
-/*
-NOTIFY * HTTP/1.1
-Host: 239.255.255.250:1982
-Cache-Control: max-age=3600
-Location: yeelight://192.168.1.239:55443
-NTS: ssdp:alive
-Server: POSIX, UPnP/1.0 YGLC/1
-id: 0x000000000015243f
-model: color
-fw_ver: 18
-support: get_prop set_default set_power toggle set_bright start_cf stop_cf set_scene
-cron_add cron_get cron_del set_ct_abx set_rgb
-power: on
-bright: 100
-color_mode: 2
-ct: 4000
-rgb: 16711680
-hue: 100
-sat: 35
-name: my_bulb
-
-HTTP/1.1 200 OK
-Cache-Control: max-age=3600
-Date:
-Ext:
-Location: yeelight://192.168.1.239:55443
-Server: POSIX UPnP/1.0 YGLC/1
-id: 0x000000000015243f
-model: color
-fw_ver: 18
-support: get_prop set_default set_power toggle set_bright start_cf stop_cf set_scene
-cron_add cron_get cron_del set_ct_abx set_rgb
-power: on
-bright: 100
-color_mode: 2
-ct: 4000
-rgb: 16711680
-hue: 100
-sat: 35
-name: my_bulb
-*/
